@@ -3,1334 +3,420 @@
 
 """
 ╔════════════════════════════════════════════════════════════════════════════╗
-║          MINECRAFT RESOURCE PACK CONVERTER: Java → Bedrock Edition         ║
-║              Tối ưu cho GeyserMC Plugin - Phiên bản 1.0.0                  ║
+║                      RESOURCE PACK CONVERTER                               ║
+║             Tác giả: LeHoangNam @ HorseKingdom Studio                      ║
 ╚════════════════════════════════════════════════════════════════════════════╝
-
-Script này tự động chuyển đổi Minecraft Resource Pack từ Java sang Bedrock Edition
-với tối ưu hoàn toàn cho plugin GeyserMC. Script bao gồm:
-
-  ✓ Quản lý cấu trúc thư mục (Input/Output)
-  ✓ Chuyển đổi Custom Model Data (CMD) -> custom_mappings.json
-  ✓ Chuyển đổi Armor & Attachables
-  ✓ Chuyển đổi Fonts & Emojis
-  ✓ Chuyển đổi Sounds & Music
-  ✓ Log chi tiết bằng tiếng Việt (hướng dẫn & giải thích)
-
-Yêu cầu: Python 3.8+, Pillow (PIL) cho xử lý ảnh
 """
 
-import os
-import json
-import shutil
-import uuid
-from pathlib import Path
-from typing import Dict, List, Tuple, Any
-import re
-import sys
+import os as _os
+import json as _json
+import shutil as _shutil
+import uuid as _uuid
+from pathlib import Path as _Path
+from typing import Dict as _Dict, List as _List, Tuple as _Tuple, Any as _Any
+import re as _re
+import sys as _sys
 
-# Cố gắng import Pillow nếu cần
 try:
-    from PIL import Image
-    HAS_PILLOW = True
+    from PIL import Image as _Image
+    _0xHAS_PIL = True
 except ImportError:
-    HAS_PILLOW = False
-    print("⚠️  Thư viện Pillow không được cài đặt. Một số tính năng xử lý ảnh sẽ bị tắt.")
-    print("   Cài đặt: pip install Pillow")
+    _0xHAS_PIL = False
+    print("\xe2\x9a\xa0\xef\xb8\x8f  Pillow \x6e\x6f\x74\x20\x66\x6f\x75\x6e\x64\x2e")
 
+class _0xLGR:
+    def __init__(self, _0x01="\x5b\x52\x65\x73\x6f\x75\x72\x63\x65\x50\x61\x63\x6b\x43\x6f\x6e\x76\x65\x72\x74\x65\x72\x5d"):
+        self._0x02 = _0x01
+        self._0x03 = 0x00
+        self._0x04 = 0x00
+    
+    def set_total_steps(self, _0x05):
+        self._0x04 = _0x05
+    
+    def step(self, _0x06, _0x07=""):
+        self._0x03 += 0x01
+        _0x08 = "\xe2\x96\x93" * self._0x03 + "\xe2\x96\x91" * (self._0x04 - self._0x03)
+        print(f"\n{self._0x02} {_0x08} [{self._0x03}/{self._0x04}] {_0x06}")
+        if _0x07:
+            print(f"          \xe2\x94\x94\xe2\x94\x80 {_0x07}")
+    
+    def info(self, _0x06):
+        print(f"{self._0x02} \xe2\x84\xb9\xef\xb8\x8f  {_0x06}")
+    
+    def success(self, _0x06):
+        print(f"{self._0x02} \xe2\x9c\x85 {_0x06}")
+    
+    def warning(self, _0x06):
+        print(f"{self._0x02} \xe2\x9a\xa0\xef\xb8\x8f  {_0x06}")
+    
+    def error(self, _0x06):
+        print(f"{self._0x02} \xe2\x9d\x8c {_0x06}")
+    
+    def explain(self, _0x09, _0x0a):
+        print(f"\n{self._0x02} \xf0\x9f\x93\x96 \x5b\x47\x49\x41\x49\x20\x54\x48\x49\x4e\x48\x5d {_0x09}")
+        for _0x0b in _0x0a.split('\n'):
+            print(f"          {_0x0b}")
+    
+    def separator(self, _0x0c="\x3d"):
+        print(f"\n{self._0x02} " + _0x0c * 0x46)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# PHẦN 1: CHUẨN BỊ & QUẢN LÝ CẤUTRÚC THƯ MỤC
-# ═══════════════════════════════════════════════════════════════════════════
+_0xlogger = _0xLGR()
 
-class Logger:
-    """Lớp quản lý output log với định dạng rõ ràng."""
-    
-    def __init__(self, prefix: str = "[ResourcePackConverter]"):
-        self.prefix = prefix
-        self.step_counter = 0
-        self.total_steps = 0
-    
-    def set_total_steps(self, total: int):
-        """Thiết lập tổng số bước."""
-        self.total_steps = total
-    
-    def step(self, message: str, details: str = ""):
-        """Log một bước tiến trình."""
-        self.step_counter += 1
-        bar = "▓" * self.step_counter + "░" * (self.total_steps - self.step_counter)
-        progress = f"[{self.step_counter}/{self.total_steps}]"
-        print(f"\n{self.prefix} {progress} {message}")
-        if details:
-            print(f"          └─ {details}")
-    
-    def info(self, message: str):
-        """Log thông tin chung."""
-        print(f"{self.prefix} ℹ️  {message}")
-    
-    def success(self, message: str):
-        """Log thành công."""
-        print(f"{self.prefix} ✅ {message}")
-    
-    def warning(self, message: str):
-        """Log cảnh báo."""
-        print(f"{self.prefix} ⚠️  {message}")
-    
-    def error(self, message: str):
-        """Log lỗi."""
-        print(f"{self.prefix} ❌ {message}")
-    
-    def explain(self, title: str, content: str):
-        """Log giải thích chi tiết (dùng cho hướng dẫn)."""
-        print(f"\n{self.prefix} 📖 [GIẢI THÍCH] {title}")
-        lines = content.split('\n')
-        for line in lines:
-            print(f"          {line}")
-    
-    def separator(self, char: str = "="):
-        """In dòng tách."""
-        print(f"\n{self.prefix} " + char * 70)
-
-
-logger = Logger()
-
-
-def validate_input_directory(java_pack_path: str) -> bool:
-    """
-    Kiểm tra xem đường dẫn nhập có phải Resource Pack Java hợp lệ không.
-    
-    Tiêu chí:
-      - Phải tồn tại thư mục 'assets'
-      - Phải có file 'pack.mcmeta' hoặc 'pack.png'
-    
-    Args:
-        java_pack_path: Đường dẫn tuyệt đối đến Java Resource Pack
-    
-    Returns:
-        True nếu hợp lệ, False nếu không
-    """
-    pack_dir = Path(java_pack_path)
-    
-    if not pack_dir.exists():
-        logger.error(f"Thư mục không tồn tại: {java_pack_path}")
+def _0xVLD(_0x0d):
+    _0x0e = _Path(_0x0d)
+    if not _0x0e.exists():
+        _0xlogger.error(f"\x54\x68\xc6\xb0\x20\x6d\xe1\xbb\xa5\x63\x20\x6b\x68\xf4\x6e\x67\x20\x74\xe1\xbb\x93\x6e\x20\x74\xe1\xba\xa1\x69\x3a\x20{_0x0d}")
         return False
-    
-    if not (pack_dir / "assets").exists():
-        logger.error(f"Không tìm thấy thư mục 'assets' - đây không phải Java Resource Pack hợp lệ")
+    if not (_0x0e / "\x61\x73\x73\x65\x74\x73").exists():
+        _0xlogger.error(f"\x4b\x68\xf4\x6e\x67\x20\x74\xec\x6d\x20\x74\x68\xe1\xba\xa5\x79\x20\x74\x68\xc6\xb0\x20\x6d\xe1\xbb\xa5\x63\x20\x27\x61\x73\x73\x65\x74\x73\x27")
         return False
-    
-    logger.success(f"Xác nhận Java Resource Pack hợp lệ: {pack_dir.name}")
+    _0xlogger.success(f"\x58\xe1\xba\xa3\x63\x20\x6e\x68\xe1\xba\xad\x6e\x20\x50\x61\x63\x6b\x3a\x20{_0x0e.name}")
     return True
 
-
-def create_bedrock_structure(output_path: str) -> Dict[str, Path]:
-    """
-    Tạo cấu trúc thư mục Bedrock Resource Pack chuẩn.
-    
-    Cấu trúc được tạo:
-      bedrock_pack/
-      ├── manifest.json           (Metadata của pack)
-      ├── pack_icon.png           (Icon của pack)
-      ├── attachables/            (Đối tượng gắn kết - Armor, Effects)
-      ├── models/                 (Model 3D)
-      ├── textures/
-      │   ├── items/              (Texture của item)
-      │   ├── models/armor/       (Texture của armor)
-      │   └── font/               (Font, Emoji)
-      ├── sounds/                 (Âm thanh)
-      ├── sound_definitions.json  (Định nghĩa âm thanh)
-      └── custom_mappings.json    (QUAN TRỌNG cho GeyserMC)
-    
-    Args:
-        output_path: Đường dẫn nơi tạo Bedrock pack
-    
-    Returns:
-        Dict chứa các Path quan trọng
-    """
-    bedrock_pack = Path(output_path)
-    bedrock_pack.mkdir(parents=True, exist_ok=True)
-    
-    # Tạo cấu trúc thư mục
-    structure = {
-        "root": bedrock_pack,
-        "attachables": bedrock_pack / "attachables",
-        "models": bedrock_pack / "models",
-        "textures": bedrock_pack / "textures",
-        "textures_items": bedrock_pack / "textures" / "items",
-        "textures_armor": bedrock_pack / "textures" / "models" / "armor",
-        "textures_font": bedrock_pack / "textures" / "font",
-        "sounds": bedrock_pack / "sounds",
+def _0xCBS(_0x0f):
+    _0x10 = _Path(_0x0f)
+    _0x10.mkdir(parents=True, exist_ok=True)
+    _0x11 = {
+        "\x72\x6f\x6f\x74": _0x10,
+        "\x61\x74\x74\x61\x63\x68\x61\x62\x6c\x65\x73": _0x10 / "\x61\x74\x74\x61\x63\x68\x61\x62\x6c\x65\x73",
+        "\x6d\x6f\x64\x65\x6c\x73": _0x10 / "\x6d\x6f\x64\x65\x6c\x73",
+        "\x74\x65\x78\x74\x75\x72\x65\x73": _0x10 / "\x74\x65\x78\x74\x75\x72\x65\x73",
+        "\x74\x65\x78\x74\x75\x72\x65\x73\x5f\x69\x74\x65\x6d\x73": _0x10 / "\x74\x65\x78\x74\x75\x72\x65\x73" / "\x69\x74\x65\x6d\x73",
+        "\x74\x65\x78\x74\x75\x72\x65\x73\x5f\x61\x72\x6d\x6f\x72": _0x10 / "\x74\x65\x78\x74\x75\x72\x65\x73" / "\x6d\x6f\x64\x65\x6c\x73" / "\x61\x72\x6d\x6f\x72",
+        "\x74\x65\x78\x74\x75\x72\x65\x73\x5f\x66\x6f\x6e\x74": _0x10 / "\x74\x65\x78\x74\x75\x72\x65\x73" / "\x66\x6f\x6e\x74",
+        "\x73\x6f\x75\x6e\x64\x73": _0x10 / "\x73\x6f\x75\x6e\x64\x73",
     }
-    
-    for folder in structure.values():
-        if folder != bedrock_pack:  # root đã được tạo
-            folder.mkdir(parents=True, exist_ok=True)
-    
-    logger.success(f"Tạo cấu trúc Bedrock Resource Pack tại: {bedrock_pack}")
-    return structure
+    for _0x12 in _0x11.values():
+        if _0x12 != _0x10:
+            _0x12.mkdir(parents=True, exist_ok=True)
+    _0xlogger.success(f"\x54\xe1\xba\xa1\x6f\x20\x63\xe1\xba\xa5\x75\x20\x74\x72\xfa\x63\x20\x74\xe1\xba\xa1\x69\x3a\x20{_0x10}")
+    return _0x11
 
-
-def generate_manifest(bedrock_pack_path: Path, java_pack_name: str = "Java Resource Pack") -> Dict[str, Any]:
-    """
-    Tạo file manifest.json chuẩn Bedrock với UUID ngẫu nhiên.
-    
-    === GIẢI THÍCH MANIFEST.JSON ===
-    
-    File manifest.json là "hộ chiếu" của Bedrock Resource Pack. Nó chứa:
-      • version: Phiên bản pack ([major, minor, patch])
-      • uuid: Định danh duy nhất (bắt buộc - Bedrock dùng UUID, không phải ID text)
-      • format_version: Phiên bản định dạng (phải tương ứng với Bedrock version)
-      • name: Tên hiển thị trong game
-      • description: Mô tả chi tiết
-    
-    Bedrock KHÔNG chấp nhận pack nếu không có valid manifest.json!
-    
-    Args:
-        bedrock_pack_path: Path đến Bedrock pack root
-        java_pack_name: Tên Java pack (dùng làm base cho tên Bedrock)
-    
-    Returns:
-        Dict chứa dữ liệu manifest
-    """
-    logger.explain(
-        "Tạo Manifest.json cho Bedrock Edition",
-        "Bedrock yêu cầu UUID duy nhất (không phải ID text như Java)\n"
-        "Format version phải tương ứng với target version của Bedrock (hiện tại: v3)\n"
-        "Manifest.json là file bắt buộc - nếu không có, pack sẽ không được nhận"
-    )
-    
-    # Tạo 2 UUID: một cho pack, một cho module (bắt buộc)
-    pack_uuid = str(uuid.uuid4())
-    module_uuid = str(uuid.uuid4())
-    
-    manifest = {
-        "format_version": 3,  # Hiện tại Bedrock dùng version 3
-        "header": {
-            "description": f"Converted from Java: {java_pack_name}",
-            "name": f"[Java→Bedrock] {java_pack_name}",
-            "uuid": pack_uuid,
-            "version": [1, 0, 0]
+def _0xGMN(_0x13, _0x14="\x4a\x61\x76\x61\x20\x52\x65\x73\x6f\x75\x72\x63\x65\x20\x50\x61\x63\x6b"):
+    _0xlogger.explain("\x4d\x61\x6e\x69\x66\x65\x73\x74", "\x47\x65\x6e\x65\x72\x61\x74\x69\x6e\x67\x20\x55\x55\x4a\x44\x25")
+    _0x15 = str(_uuid.uuid4())
+    _0x16 = str(_uuid.uuid4())
+    _0x17 = {
+        "\x66\x6f\x72\x6d\x61\x74\x5f\x76\x65\x72\x73\x69\x6f\x6e": 0x03,
+        "\x68\x65\x61\x64\x65\x72": {
+            "\x64\x65\x73\x63\x72\x69\x70\x74\x69\x6f\x6e": f"\x43\x6f\x6e\x76\x65\x72\x74\x65\x64\x3a\x20{_0x14}",
+            "\x6e\x61\x6d\x65": f"\x5b\x4a\xe2\x86\x92\x42\x5d\x20{_0x14}",
+            "\x75\x75\x69\x64": _0x15,
+            "\x76\x65\x72\x73\x69\x6f\x6e": [0x01, 0x00, 0x00]
         },
-        "modules": [
+        "\x6d\x6f\x64\x75\x6c\x65\x73": [
             {
-                "description": "Resource Pack",
-                "type": "resources",
-                "uuid": module_uuid,
-                "version": [1, 0, 0]
+                "\x64\x65\x73\x63\x72\x69\x70\x74\x69\x6f\x6e": "\x52\x65\x73\x6f\x75\x72\x63\x65\x73",
+                "\x74\x79\x70\x65": "\x72\x65\x73\x6f\x75\x72\x63\x65\x73",
+                "\x75\x75\x69\x64": _0x16,
+                "\x76\x65\x72\x73\x69\x6f\x6e": [0x01, 0x00, 0x00]
             }
         ],
-        "metadata": {
-            "generated_by": "Minecraft Java→Bedrock Resource Pack Converter v1.0.0",
-            "conversion_date": __import__('datetime').datetime.now().isoformat()
+        "\x6d\x65\x74\x61\x64\x61\x74\x61": {
+            "\x67\x65\x6e\x65\x72\x61\x74\x65\x64\x5f\x62\x79": "\x4f\x62\x66\x75\x73\x63\x61\x74\x65\x64\x20\x43\x6f\x6e\x76\x65\x72\x74\x65\x72",
+            "\x64\x61\x74\x65": __import__('\x64\x61\x74\x65\x74\x69\x6d\x65').datetime.now().isoformat()
         }
     }
-    
-    # Ghi file
-    manifest_path = bedrock_pack_path / "manifest.json"
-    with open(manifest_path, 'w', encoding='utf-8') as f:
-        json.dump(manifest, f, indent=2, ensure_ascii=False)
-    
-    logger.success(f"Tạo manifest.json (UUID: {pack_uuid[:8]}...)")
-    logger.info(f"Module UUID: {module_uuid[:8]}...")
-    
-    return manifest
+    with open(_0x13 / "\x6d\x61\x6e\x69\x66\x65\x73\x74\x2e\x6a\x73\x6f\x6e", '\x77', encoding='\x75\x74\x66\x2d\x38') as _0xf:
+        _0xjson.dump(_0x17, _0xf, indent=0x02, ensure_ascii=False)
+    return _0x17
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# PHẦN 2: CHUYỂN ĐỔI ITEMS & CUSTOM MODEL DATA (CMD)
-# ═══════════════════════════════════════════════════════════════════════════
-
-def scan_custom_model_data(java_assets_path: Path) -> Dict[str, List[int]]:
-    """
-    Quét các file JSON trong 'assets/minecraft/models/item/' để tìm custom_model_data.
-    
-    === GIẢI THÍCH CUSTOM MODEL DATA (CMD) ===
-    
-    Java Edition dùng cơ chế "Predicate" để định nghĩa multiple models cho một item:
-      {
-        "overrides": [
-          {
-            "predicate": {"custom_model_data": 1},
-            "model": "item/custom/sword_variant_1"
-          },
-          {
-            "predicate": {"custom_model_data": 2},
-            "model": "item/custom/sword_variant_2"
-          }
-        ]
-      }
-    
-    Khi player có item với CustomModelData:1 trong NBT, Java sẽ render model variant_1.
-    
-    Bedrock Edition KHÔNG có cơ chế "predicate" này. Thay vào đó:
-      • GeyserMC tạo "virtual items" trong Bedrock (bộ nhớ đệm)
-      • Dùng file "custom_mappings.json" để ánh xạ:
-        Java CMD ID → Bedrock Virtual Item ID
-      • Khi player nhận item từ Java server, Geyser convert CMD thành ID Bedrock
-    
-    Args:
-        java_assets_path: Path đến assets/minecraft/
-    
-    Returns:
-        Dict[item_name] = [list của CMD IDs]
-    """
-    logger.explain(
-        "Quét Custom Model Data (CMD) từ Java",
-        "Java dùng 'predicate' trong JSON models để chỉ định variant item\n"
-        "GeyserMC cần convert sang Bedrock virtual item IDs\n"
-        "custom_mappings.json là cầu nối giữa Java CMD và Bedrock"
-    )
-    
-    cmd_mapping = {}
-    models_dir = java_assets_path / "minecraft" / "models" / "item"
-    
-    if not models_dir.exists():
-        logger.warning(f"Thư mục models/item không tồn tại: {models_dir}")
-        return cmd_mapping
-    
-    logger.info(f"Quét thư mục: {models_dir}")
-    
-    # Quét tất cả file .json trong thư mục item
-    for json_file in models_dir.rglob("*.json"):
+def _0xSCMD(_0x18):
+    _0x19 = {}
+    _0x1a = _0x18 / "\x6d\x69\x6e\x65\x63\x72\x61\x66\x74" / "\x6d\x6f\x64\x65\x6c\x73" / "\x69\x74\x65\x6d"
+    if not _0x1a.exists():
+        return _0x19
+    for _0x1b in _0x1a.rglob("\x2a\x2e\x6a\x73\x6f\x6e"):
         try:
-            with open(json_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            # Tìm mục "overrides" chứa custom_model_data
-            if "overrides" in data:
-                item_name = json_file.stem
-                cmd_list = []
-                
-                for override in data["overrides"]:
-                    if "predicate" in override:
-                        predicate = override["predicate"]
-                        if "custom_model_data" in predicate:
-                            cmd_id = predicate["custom_model_data"]
-                            cmd_list.append(cmd_id)
-                
-                if cmd_list:
-                    cmd_mapping[item_name] = sorted(cmd_list)
-                    logger.info(f"  ├─ {item_name}: {len(cmd_list)} variant(s) - IDs: {cmd_list[:3]}{'...' if len(cmd_list) > 3 else ''}")
-        
-        except json.JSONDecodeError as e:
-            logger.warning(f"Lỗi đọc JSON: {json_file.name} - {e}")
-        except Exception as e:
-            logger.warning(f"Lỗi xử lý: {json_file.name} - {e}")
-    
-    logger.success(f"Quét xong - tìm được {len(cmd_mapping)} item với CMD")
-    return cmd_mapping
+            with open(_0x1b, '\x72', encoding='\x75\x74\x66\x2d\x38') as _0xf:
+                _0x1c = _0xjson.load(_0xf)
+            if "\x6f\x76\x65\x72\x72\x69\x64\x65\x73" in _0x1c:
+                _0x1d = _0x1b.stem
+                _0x1e = []
+                for _0x1f in _0x1c["\x6f\x76\x65\x72\x72\x69\x64\x65\x73"]:
+                    if "\x70\x72\x65\x64\x69\x63\x61\x74\x65" in _0x1f:
+                        _0x20 = _0x1f["\x70\x72\x65\x64\x69\x63\x61\x74\x65"]
+                        if "\x63\x75\x73\x74\x6f\x6d\x5f\x6d\x6f\x64\x65\x6c\x5f\x64\x61\x74\x61" in _0x20:
+                            _0x1e.append(_0x20["\x63\x75\x73\x74\x6f\x6d\x5f\x6d\x6f\x64\x65\x6c\x5f\x64\x61\x74\x61"])
+                if _0x1e:
+                    _0x19[_0x1d] = sorted(_0x1e)
+        except Exception:
+            pass
+    return _0x19
 
-
-def convert_items(java_pack_path: Path, bedrock_structure: Dict[str, Path], 
-                  custom_mappings: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Chuyển đổi Custom Model Data từ Java sang Bedrock.
-    
-    === QUY TRÌNH CHUYỂN ĐỔI ITEMS ===
-    
-    1. Quét các JSON models trong assets/minecraft/models/item/
-    2. Tìm các item có predicate "custom_model_data"
-    3. Sao chép texture .png từ assets/minecraft/textures/item/ sang Bedrock
-    4. Tạo entry trong custom_mappings.json:
-       {
-         "java_cmd": {
-           "item_id": "minecraft:item_name",
-           "cmd_id": 1,
-           "bedrock_id": "item.geyser.custom_1"
-         }
-       }
-    
-    GeyserMC sẽ đọc file này và convert CMD lúc chơi.
-    
-    Args:
-        java_pack_path: Path Java Resource Pack
-        bedrock_structure: Dict cấu trúc Bedrock
-        custom_mappings: Dict để thêm dữ liệu mapping
-    
-    Returns:
-        Dict chứa thông tin các item đã convert
-    """
-    logger.step("Chuyển đổi Items & Custom Model Data")
-    
-    java_assets = java_pack_path / "assets"
-    
-    # Quét CMD
-    cmd_mappings = scan_custom_model_data(java_assets)
-    
-    items_converted = {
-        "total": len(cmd_mappings),
-        "items": {},
-        "texture_copied": 0
-    }
-    
-    if not cmd_mappings:
-        logger.info("Không tìm thấy Custom Model Data nào để convert")
-        return items_converted
-    
-    # Tạo mapping cho mỗi item
-    custom_mappings["java_cmd"] = {}
-    
-    texture_source = java_assets / "minecraft" / "textures" / "item"
-    
-    for item_name, cmd_ids in cmd_mappings.items():
-        item_entry = {
-            "item_id": f"minecraft:{item_name}",
-            "variants": []
-        }
-        
-        for cmd_id in cmd_ids:
-            # Tạo Bedrock virtual ID cho variant này
-            bedrock_virtual_id = f"item.geyser.{item_name}_{cmd_id}"
-            
-            item_entry["variants"].append({
-                "cmd_id": cmd_id,
-                "bedrock_id": bedrock_virtual_id
-            })
-            
-            # Thêm vào custom_mappings
-            mapping_key = f"{item_name}_{cmd_id}"
-            custom_mappings["java_cmd"][mapping_key] = {
-                "java_item": f"minecraft:{item_name}",
-                "custom_model_data": cmd_id,
-                "bedrock_virtual_id": bedrock_virtual_id
+def _0xCIT(_0x21, _0x22, _0x23):
+    _0xlogger.step("\x50\x72\x6f\x63\x65\x73\x73\x69\x6e\x67\x20\x49\x74\x65\x6d\x73")
+    _0x24 = _0x21 / "\x61\x73\x73\x65\x74\x73"
+    _0x25 = _0xSCMD(_0x24)
+    _0x26 = {"\x74\x6f\x74\x61\x6c": len(_0x25), "\x69\x74\x65\x6d\x73": {}, "\x74\x65\x78\x74\x75\x72\x65\x5f\x63\x6f\x70\x69\x65\x64": 0x00}
+    if not _0x25:
+        return _0x26
+    _0x23["\x6a\x61\x76\x61\x5f\x63\x6d\x64"] = {}
+    _0x27 = _0x24 / "\x6d\x69\x6e\x65\x63\x72\x61\x66\x74" / "\x74\x65\x78\x74\x75\x72\x65\x73" / "\x69\x74\x65\x6d"
+    for _0x28, _0x29 in _0x25.items():
+        _0x2a = {"\x69\x74\x65\x6d\x5f\x69\x64": f"\x6d\x69\x6e\x65\x63\x72\x61\x66\x74\x3a{_0x28}", "\x76\x61\x72\x69\x61\x6e\x74\x73": []}
+        for _0x2b in _0x29:
+            _0x2c = f"\x69\x74\x65\x6d\x2e\x67\x65\x79\x73\x65\x72\x2e{_0x28}\x5f{_0x2b}"
+            _0x2a["\x76\x61\x72\x69\x61\x6e\x74\x73"].append({"\x63\x6d\x64\x5f\x69\x64": _0x2b, "\x62\x65\x64\x72\x6f\x63\x6b\x5f\x69\x64": _0x2c})
+            _0x23["\x6a\x61\x76\x61\x5f\x63\x6d\x64"][f"{_0x28}\x5f{_0x2b}"] = {
+                "\x6a\x61\x76\x61\x5f\x6item": f"\x6d\x69\x6e\x65\x63\x72\x61\x66\x74\x3a{_0x28}",
+                "\x63\x75\x73\x74\x6f\x6d\x5f\x6d\x6f\x64\x65\x6c\x5f\x64\x61\x74\x61": _0x2b,
+                "\x62\x65\x64\x72\x6f\x63\x6b\x5f\x76\x69\x72\x74\x75\x61\x6c\x5f\x69\x64": _0x2c
             }
-            
-            logger.info(f"  ├─ Map: {item_name} (CMD {cmd_id}) → {bedrock_virtual_id}")
-        
-        items_converted["items"][item_name] = item_entry
-        
-        # Cố gắng sao chép texture
-        texture_file = texture_source / f"{item_name}.png"
-        if texture_file.exists():
-            dest = bedrock_structure["textures_items"] / f"{item_name}.png"
-            shutil.copy2(texture_file, dest)
-            items_converted["texture_copied"] += 1
-            logger.info(f"  └─ Sao chép texture: {item_name}.png")
-    
-    logger.success(
-        f"Chuyển đổi {len(cmd_mappings)} item, "
-        f"sao chép {items_converted['texture_copied']} texture"
-    )
-    
-    return items_converted
+        _0x26["\x69\x74\x65\x6d\x73"][_0x28] = _0x2a
+        _0x2d = _0x27 / f"{_0x28}\x2e\x70\x6e\x67"
+        if _0x2d.exists():
+            _0x2e = _0x22["\x74\x65\x78\x74\x75\x72\x65\x73\x5f\x69\x74\x65\x6d\x73"] / f"{_0x28}\x2e\x70\x6e\x67"
+            _0xshutil.copy2(_0x2d, _0x2e)
+            _0x26["\x74\x65\x78\x74\x75\x72\x65\x5f\x63\x6f\x70\x69\x65\x64"] += 0x01
+    return _0x26
 
+def _0xSAT(_0x2f):
+    _0x30 = {}
+    _0x31 = _0x2f / "\x6d\x69\x6e\x65\x63\x72\x61\x66\x74" / "\x74\x65\x78\x74\x75\x72\x65\x73" / "\x6d\x6f\x64\x65\x6c\x73" / "\x61\x72\x6d\x6f\x72"
+    if not _0x31.exists():
+        return _0x30
+    _0x32 = list(_0x31.glob("\x2a\x5f\x6c\x61\x79\x65\x72\x5f\x31\x2e\x70\x6e\x67"))
+    for _0x33 in _0x32:
+        _0x34 = _0x33.stem.replace("\x5f\x6c\x61\x79\x65\x72\x5f\x31", "")
+        _0x35 = _0x31 / f"{_0x34}\x5f\x6c\x61\x79\x65\x72\x5f\x32\x2e\x70\x6e\x67"
+        if _0x35.exists():
+            _0x30[_0x34] = [_0x33.name, _0x35.name]
+    return _0x30
 
-# ═══════════════════════════════════════════════════════════════════════════
-# PHẦN 3: CHUYỂN ĐỔI ARMOR & ATTACHABLES
-# ═══════════════════════════════════════════════════════════════════════════
-
-def scan_armor_textures(java_assets_path: Path) -> Dict[str, List[str]]:
-    """
-    Quét các file texture giáp từ thư mục textures/models/armor/ của Java.
-    
-    === ĐỊNH DẠNG ARMOR TEXTURE JAVA ===
-    
-    Java dùng cộng 2 lớp texture cho armor:
-      • [name]_layer_1.png: Lớp ngoài (mail, chainmail detail)
-      • [name]_layer_2.png: Lớp trong (các chi tiết phía dưới)
-    
-    Vd: diamond_layer_1.png, diamond_layer_2.png
-    
-    Bedrock Edition khác biệt:
-      • Dùng single texture với định nghĩa "geometry" riêng
-      • Attachables JSON định nghĩa cách texture gắn vào player model
-      • Cần tạo file geometry.json để định vị texture trên player body
-    
-    Args:
-        java_assets_path: Path đến assets/minecraft/
-    
-    Returns:
-        Dict[armor_name] = [layer_1, layer_2]
-    """
-    armor_mapping = {}
-    armor_dir = java_assets_path / "minecraft" / "textures" / "models" / "armor"
-    
-    if not armor_dir.exists():
-        logger.warning(f"Thư mục armor không tồn tại: {armor_dir}")
-        return armor_mapping
-    
-    # Tìm các cặp layer_1 và layer_2
-    layer1_files = list(armor_dir.glob("*_layer_1.png"))
-    
-    for layer1 in layer1_files:
-        armor_name = layer1.stem.replace("_layer_1", "")
-        layer2 = armor_dir / f"{armor_name}_layer_2.png"
-        
-        if layer2.exists():
-            armor_mapping[armor_name] = [layer1.name, layer2.name]
-            logger.info(f"  ├─ Tìm armor: {armor_name} (2 layers)")
-    
-    return armor_mapping
-
-
-def create_armor_attachable(armor_name: str, bedrock_structure: Dict[str, Path]) -> str:
-    """
-    Tạo file attachable JSON cho custom armor trong Bedrock.
-    
-    === ATTACHABLES.JSON LÀ GÌ? ===
-    
-    Attachables là cơ chế trong Bedrock để "gắn" object vào player:
-      • Armor (giáp)
-      • Cosmetics (phụ kiện)
-      • Effects (hiệu ứng trang trí)
-    
-    Attachable định nghĩa:
-      1. Geometry: Hình dạng/kích thước object
-      2. Texture: Ánh xạ texture lên geometry
-      3. Render group: Layer vẽ (ngoài/trong armor)
-    
-    GeyserMC sẽ:
-      1. Detect armor trên Java player
-      2. Ánh xạ sang Bedrock custom armor (qua custom_mappings.json)
-      3. Render attachable này lên Bedrock player model
-    
-    Ví dụ file:
-      {
-        "format_version": "1.10.0",
-        "attachable": {
-          "description": {
-            "identifier": "geometry.armor.custom_diamond",
-            "materials": {...},
-            "geometry": {...},
-            "animations": {...}
-          }
-        }
-      }
-    
-    Args:
-        armor_name: Tên armor (vd: "diamond", "netherite")
-        bedrock_structure: Dict cấu trúc Bedrock
-    
-    Returns:
-        Path đến file attachable được tạo
-    """
-    
-    # Template đơn giản cho attachable
-    attachable_template = {
-        "format_version": "1.10.0",
-        "attachable": {
-            "description": {
-                "identifier": f"geometry.armor.custom_{armor_name}",
-                "materials": {
-                    "default": "armor"
-                },
-                "textures": {
-                    "default": f"textures/models/armor/{armor_name}_layer_1"
-                },
-                "geometry": {
-                    "default": f"geometry.armor.{armor_name}"
-                },
-                "scripts": {
-                    "pre_animation": [
-                        "variable.chest_layer_visible = 1.0;"
-                    ]
-                },
-                "animations": {
-                    "all_animations": 0.0
-                },
-                "animation_controllers": [
-                    {
-                        "animation_controller": "controller.animation.armor.default"
-                    }
-                ]
+def _0xCAA(_0x36, _0x37):
+    _0x38 = {
+        "\x66\x6f\x72\x6d\x61\x74\x5f\x76\x65\x72\x73\x69\x6f\x6e": "\x31\x2e\x31\x30\x2e\x30",
+        "\x61\x74\x74\x61\x63\x68\x61\x62\x6c\x65": {
+            "\x64\x65\x73\x63\x72\x69\x70\x74\x69\x6f\x6e": {
+                "\x69\x64\x65\x6e\x74\x69\x66\x69\x65\x72": f"\x67\x65\x6f\x6d\x65\x74\x72\x79\x2e\x61\x72\x6d\x6f\x72\x2e\x63\x75\x73\x74\x6f\x6d\x5f{_0x36}",
+                "\x6d\x61\x74\x65\x72\x69\x61\x6c\x73": {"\x64\x65\x66\x61\x75\x6c\x74": "\x61\x72\x6d\x6f\x72"},
+                "\x74\x65\x78\x74\x75\x72\x65\x73": {"\x64\x65\x66\x61\x75\x6c\x74": f"\x74\x65\x78\x74\x75\x72\x65\x73\x2f\x6d\x6f\x64\x65\x6c\x73\x2f\x61\x72\x6d\x6f\x72\x2f{_0x36}\x5f\x6c\x61\x79\x65\x72\x5f\x31"},
+                "\x67\x65\x6f\x6d\x65\x74\x72\x79": {"\x64\x65\x66\x61\x75\x6c\x74": f"\x67\x65\x6f\x6d\x65\x74\x72\x79\x2e\x61\x72\x6d\x6f\x72\x2e{_0x36}"},
+                "\x73\x63\x72\x69\x70\x74\x73": {"\x70\x72\x65\x5f\x61\x6e\x69\x6d\x61\x74\x69\x6f\x6e": ["\x76\x61\x72\x69\x61\x62\x6c\x65\x2e\x63\x68\x65\x73\x74\x5f\x6c\x61\x79\x65\x72\x5f\x76\x69\x73\x69\x62\x6c\x65\x20\x3d\x20\x31\x2e\x30\x3b"]},
+                "\x61\x6e\x69\x6d\x61\x74\x69\x6f\x6e\x73": {"\x61\x6c\x6c\x5f\x61\x6e\x69\x6d\x61\x74\x69\x6f\x6e\x73": 0.0},
+                "\x61\x6e\x69\x6d\x61\x74\x69\x6f\x6e\x5f\x63\x6f\x6e\x74\x72\x6f\x6c\x6c\x65\x72\x73": [{"\x61\x6e\x69\x6d\x61\x74\x69\x6f\x6e\x5f\x63\x6f\x6e\x74\x72\x6f\x6c\x6c\x65\x72": "\x63\x6f\x6e\x74\x72\x6f\x6c\x6c\x65\x72\x2e\x61\x6e\x69\x6d\x61\x74\x69\x6f\x6e\x2e\x61\x72\x6d\x6f\x72\x2e\x64\x65\x66\x61\x75\x6c\x74"}]
             }
         }
     }
-    
-    # Ghi file attachable
-    attachable_path = bedrock_structure["attachables"] / f"{armor_name}.json"
-    with open(attachable_path, 'w', encoding='utf-8') as f:
-        json.dump(attachable_template, f, indent=2, ensure_ascii=False)
-    
-    logger.info(f"  └─ Tạo attachable: {armor_name}.json")
-    return str(attachable_path)
+    _0x39 = _0x37["\x61\x74\x74\x61\x63\x68\x61\x62\x6c\x65\x73"] / f"{_0x36}\x2e\x6a\x73\x6f\x6e"
+    with open(_0x39, '\x77', encoding='\x75\x74\x66\x2d\x38') as _0xf:
+        _0xjson.dump(_0x38, _0xf, indent=0x02, ensure_ascii=False)
+    return str(_0x39)
 
-
-def convert_armor(java_pack_path: Path, bedrock_structure: Dict[str, Path],
-                  custom_mappings: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Chuyển đổi Custom Armor từ Java sang Bedrock.
-    
-    === QUY TRÌNH CHUYỂN ĐỔI ARMOR ===
-    
-    1. Quét textures armor từ assets/minecraft/textures/models/armor/
-    2. Sao chép [name]_layer_1.png và [name]_layer_2.png sang Bedrock
-    3. Tạo file attachable JSON cho mỗi armor
-    4. Tạo geometry.json đơn giản (Bedrock cần định nghĩa hình học)
-    5. Thêm mapping vào custom_mappings.json:
-       {
-         "custom_armor": {
-           "diamond": {
-             "java_id": "minecraft:diamond_helmet",
-             "bedrock_armor_id": "armor.custom_diamond"
-           }
-         }
-       }
-    
-    GeyserMC sẽ kiểm tra: Nếu Java player mặc armor custom, render attachable Bedrock tương ứng.
-    
-    Args:
-        java_pack_path: Path Java Resource Pack
-        bedrock_structure: Dict cấu trúc Bedrock
-        custom_mappings: Dict để thêm dữ liệu mapping
-    
-    Returns:
-        Dict thông tin armor đã convert
-    """
-    logger.step("Chuyển đổi Custom Armor & Attachables")
-    
-    logger.explain(
-        "Armor trong Java vs Bedrock",
-        "Java: Texture + Entity Model định sẵn\n"
-        "Bedrock: Dùng Attachables + Geometry JSON\n"
-        "GeyserMC: Bridge - detect armor Java, render attachable Bedrock"
-    )
-    
-    java_assets = java_pack_path / "assets"
-    
-    # Quét armor
-    armor_list = scan_armor_textures(java_assets)
-    
-    armor_converted = {
-        "total": len(armor_list),
-        "armor": {},
-        "texture_copied": 0
-    }
-    
-    if not armor_list:
-        logger.info("Không tìm thấy custom armor textures")
-        return armor_converted
-    
-    custom_mappings["custom_armor"] = {}
-    
-    armor_texture_src = java_assets / "minecraft" / "textures" / "models" / "armor"
-    
-    for armor_name, layers in armor_list.items():
-        armor_entry = {
-            "layers": [],
-            "attachable": None
+def _0xCAR(_0x3a, _0x3b, _0x3c):
+    _0xlogger.step("\x50\x72\x6f\x63\x65\x73\x73\x69\x6e\x67\x20\x41\x72\x6d\x6f\x72")
+    _0x3d = _0x3a / "\x61\x73\x73\x65\x74\x73"
+    _0x3e = _0xSAT(_0x3d)
+    _0x3f = {"\x74\x6f\x74\x61\x6c": len(_0x3e), "\x61\x72\x6d\x6f\x72": {}, "\x74\x65\x78\x74\x75\x72\x65\x5f\x63\x6f\x70\x69\x65\x64": 0x00}
+    if not _0x3e:
+        return _0x3f
+    _0x3c["\x63\x75\x73\x74\x6f\x6d\x5f\x61\x72\x6d\x6f\x72"] = {}
+    _0x40 = _0x3d / "\x6d\x69\x6e\x65\x63\x72\x61\x66\x74" / "\x74\x65\x78\x74\x75\x72\x65\x73" / "\x6d\x6f\x64\x65\x6c\x73" / "\x61\x72\x6d\x6f\x72"
+    for _0x41, _0x42 in _0x3e.items():
+        _0x43 = {"\x6c\x61\x79\x65\x72\x73": [], "\x61\x74\x74\x61\x63\x68\x61\x62\x6c\x65": None}
+        for _0x44 in _0x42:
+            _0x45 = _0x40 / _0x44
+            if _0x45.exists():
+                _0x46 = _0x3b["\x74\x65\x78\x74\x75\x72\x65\x73\x5f\x61\x72\x6d\x6f\x72"] / _0x44
+                _0shutil.copy2(_0x45, _0x46)
+                _0x43["\x6c\x61\x79\x65\x72\x73"].append(_0x44)
+                _0x3f["\x74\x65\x78\x74\x75\x72\x65\x5f\x63\x6f\x70\x69\x65\x64"] += 0x01
+        _0x47 = _0xCAA(_0x41, _0x3b)
+        _0x43["\x61\x74\x74\x61\x63\x68\x61\x62\x6c\x65"] = _0x47
+        _0x3c["\x63\x75\x73\x74\x6f\x6d\x5f\x61\x72\x6d\x6f\x72"][_0x41] = {
+            "\x6a\x61\x76\x61\x5f\x69\x74\x65\x6d\x5f\x70\x72\x65\x66\x69\x78": f"\x6d\x69\x6e\x65\x63\x72\x61\x66\x74\x3a{_0x41}",
+            "\x62\x65\x64\x72\x6f\x63\x6b\x5f\x61\x72\x6d\x6f\x72\x5f\x69\x64": f"\x61\x72\x6d\x6f\x72\x2e\x63\x75\x73\x74\x6f\x6d\x5f{_0x41}",
+            "\x61\x74\x74\x61\x63\x68\x61\x62\x6c\x65\x5f\x66\x69\x6c\x65": f"\x61\x74\x74\x61\x63\x68\x61\x62\x6c\x65\x73\x2f{_0x41}\x2e\x6a\x73\x6f\x6e",
+            "\x74\x65\x78\x74\x75\x72\x65\x73": _0x43["\x6c\x61\x79\x65\x72\x73"]
         }
-        
-        # Sao chép textures
-        for layer_file in layers:
-            src = armor_texture_src / layer_file
-            if src.exists():
-                dest = bedrock_structure["textures_armor"] / layer_file
-                shutil.copy2(src, dest)
-                armor_entry["layers"].append(layer_file)
-                armor_converted["texture_copied"] += 1
-                logger.info(f"  ├─ Sao chép: {layer_file}")
-        
-        # Tạo attachable
-        attachable_path = create_armor_attachable(armor_name, bedrock_structure)
-        armor_entry["attachable"] = attachable_path
-        
-        # Thêm vào mapping
-        custom_mappings["custom_armor"][armor_name] = {
-            "java_item_prefix": f"minecraft:{armor_name}",
-            "bedrock_armor_id": f"armor.custom_{armor_name}",
-            "attachable_file": f"attachables/{armor_name}.json",
-            "textures": armor_entry["layers"]
-        }
-        
-        armor_converted["armor"][armor_name] = armor_entry
-    
-    logger.success(
-        f"Chuyển đổi {len(armor_list)} custom armor, "
-        f"sao chép {armor_converted['texture_copied']} texture layers"
-    )
-    
-    return armor_converted
+        _0x3f["\x61\x72\x6d\x6f\x72"][_0x41] = _0x43
+    return _0x3f
 
+def _0xSFF(_0x48):
+    _0x49 = []
+    _0x4a = _0x48 / "\x6d\x69\x6e\x65\x63\x72\x61\x66\x74" / "\x74\x65\x78\x74\x75\x72\x65\x73" / "\x66\x6f\x6e\x74"
+    if not _0x4a.exists():
+        return _0x49
+    for _0x4b in _0x4a.glob("\x2a\x2e\x70\x6e\x67"):
+        _0x49.append(_0x4b.name)
+    return _0x49
 
-# ═══════════════════════════════════════════════════════════════════════════
-# PHẦN 4: CHUYỂN ĐỔI FONTS & EMOJIS
-# ═══════════════════════════════════════════════════════════════════════════
-
-def scan_font_files(java_assets_path: Path) -> List[str]:
-    """Quét các file font/emoji từ Java."""
-    font_files = []
-    font_dir = java_assets_path / "minecraft" / "textures" / "font"
-    
-    if not font_dir.exists():
-        logger.warning(f"Thư mục font không tồn tại: {font_dir}")
-        return font_files
-    
-    for png_file in font_dir.glob("*.png"):
-        font_files.append(png_file.name)
-        logger.info(f"  ├─ Tìm font/emoji: {png_file.name}")
-    
-    return font_files
-
-
-def create_font_definition(emoji_textures: List[str]) -> Dict[str, Any]:
-    """
-    Tạo file font/default.json cho Bedrock.
-    
-    === FONTS & EMOJIS TRONG BEDROCK ===
-    
-    Java dùng "Unicode Font Files" - ánh xạ mã Unicode trực tiếp lên texture.
-    
-    Bedrock dùng "Font Definition" - JSON file định nghĩa:
-      • Texture atlas: Tất cả ký tự trên một tấm ảnh lớn
-      • Glyph mappings: Mã Unicode → Tọa độ (x, y, width, height) trên atlas
-    
-    Font definition trong Bedrock:
-      {
-        "default": {
-          "font": "path/to/bitmap.png",
-          "glyphs": [
-            {
-              "chars": "A",
-              "ascent": 8,
-              "height": 10,
-              "glyphs": [
-                {"char": "A", "x": 0, "y": 0, "w": 8, "h": 10}
-              ]
-            }
-          ]
-        }
-      }
-    
-    Args:
-        emoji_textures: List tên file texture
-    
-    Returns:
-        Dict định nghĩa font
-    """
-    
-    logger.explain(
-        "Fonts & Emojis: Java vs Bedrock",
-        "Java: Unicode Font Files - mã Unicode trực tiếp chỉ thành texture pixel\n"
-        "Bedrock: Font definition JSON + Glyph atlas\n"
-        "Conversion: Cần scan Java font PNG, tạo glyph mapping Bedrock"
-    )
-    
-    font_def = {
-        "default": {
-            "font": "textures/font/default.png",
-            "glyphs": []
+def _0xCFD(_0x4c):
+    _0x4d = {
+        "\x64\x65\x66\x61\x75\x6c\x74": {
+            "\x66\x6f\x6e\x74": "\x74\x65\x78\x74\x75\x72\x65\x73\x2f\x66\x6f\x6e\x74\x2f\x64\x65\x66\x61\x75\x6c\x74\x2e\x70\x6e\x67",
+            "\x67\x6c\x79\x70\x68\x73": []
         }
     }
-    
-    # Tạo glyph entries đơn giản
-    if emoji_textures:
-        font_def["default"]["glyphs"].append({
-            "chars": "🎮🎨🎭🎪",
-            "ascent": 8,
-            "height": 8,
-            "glyphs": [
-                {"char": "🎮", "x": 0, "y": 0, "w": 8, "h": 8}
-            ]
+    if _0x4c:
+        _0x4d["\x64\x65\x66\x61\x75\x6c\x74"]["\x67\x6c\x79\x70\x68\x73"].append({
+            "\x63\x68\x61\x72\x73": "\xf0\x9f\x8e\xae\xf0\x9f\x8e\xa8\xf0\x9f\x8e\xad\xf0\x9f\x8e\xaa",
+            "\x61\x73\x63\x65\x6e\x74": 0x08,
+            "\x68\x65\x69\x67\x68\x74": 0x08,
+            "\x67\x6c\x79\x70\x68\x73": [{"\x63\x68\x61\x72": "\xf0\x9f\x8e\xae", "\x78": 0x00, "\x79": 0x00, "\x77": 0x08, "\x68": 0x08}]
         })
-    
-    return font_def
+    return _0x4d
 
+def _0xCFT(_0x4e, _0x4f, _0x50):
+    _0xlogger.step("\x50\x72\x6f\x63\x65\x73\x73\x69\x6e\x67\x20\x46\x6f\x6e\x74\x73")
+    _0x51 = _0x4e / "\x61\x73\x73\x65\x74\x73"
+    _0x52 = _0xSFF(_0x51)
+    _0x53 = {"\x74\x6f\x74\x61\x6c": len(_0x52), "\x66\x69\x6c\x65\x73": [], "\x72\x65\x71\x75\x69\x72\x65\x73\x5f\x6d\x61\x6e\x75\x61\x6c\x5f\x61\x64\x6a\x75\x73\x74\x6d\x65\x6e\x74": not _0xHAS_PIL}
+    if not _0x52:
+        return _0x53
+    _0x54 = _0x51 / "\x6d\x69\x6e\x65\x63\x72\x61\x66\x74" / "\x74\x65\x78\x74\x75\x72\x65\x73" / "\x66\x6f\x6e\x74"
+    for _0x55 in _0x52:
+        _0x56 = _0x54 / _0x55
+        _0x57 = _0x4f["\x74\x65\x78\x74\x75\x72\x65\x73\x5f\x66\x6f\x6e\x74"] / _0x55
+        _0shutil.copy2(_0x56, _0x57)
+        _0x53["\x66\x69\x6c\x65\x73"].append(_0x55)
+    _0x58 = _0xCFD(_0x52)
+    _0x59 = _0x4f["\x72\x6f\x6f\x74"] / "\x66\x6f\x6e\x74"
+    _0x59.mkdir(parents=True, exist_ok=True)
+    with open(_0x59 / "\x64\x65\x66\x61\x75\x6c\x74\x2e\x6a\x73\x6f\x6e", '\x77', encoding='\x75\x74\x66\x2d\x38') as _0xf:
+        _0xjson.dump(_0x58, _0xf, indent=0x02, ensure_ascii=False)
+    return _0x53
 
-def convert_fonts(java_pack_path: Path, bedrock_structure: Dict[str, Path],
-                  custom_mappings: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Chuyển đổi Fonts & Emojis từ Java sang Bedrock.
-    
-    === QUY TRÌNH CHUYỂN ĐỔI FONTS ===
-    
-    1. Quét font PNG từ assets/minecraft/textures/font/
-    2. Sao chép font images sang textures/font/ của Bedrock
-    3. Tạo file font/default.json để Bedrock hiểu glyph mapping
-    4. (Tuỳ chọn) Nếu có Pillow: Scan ảnh để tạo glyph coordinates tự động
-    5. Thêm vào custom_mappings.json nếu có custom fonts
-    
-    Lưu ý: Conversion hoàn hảo cần phân tích PNG texture để tìm glyph bounds.
-           Script này tạo template cơ bản - có thể cần chỉnh sửa thủ công.
-    
-    Args:
-        java_pack_path: Path Java Resource Pack
-        bedrock_structure: Dict cấu trúc Bedrock
-        custom_mappings: Dict để thêm dữ liệu
-    
-    Returns:
-        Dict thông tin font đã convert
-    """
-    logger.step("Chuyển đổi Fonts & Emojis")
-    
-    java_assets = java_pack_path / "assets"
-    font_files = scan_font_files(java_assets)
-    
-    fonts_converted = {
-        "total": len(font_files),
-        "files": [],
-        "requires_manual_adjustment": HAS_PILLOW == False
-    }
-    
-    if not font_files:
-        logger.info("Không tìm thấy custom fonts/emojis")
-        return fonts_converted
-    
-    # Sao chép font files
-    font_src = java_assets / "minecraft" / "textures" / "font"
-    for font_file in font_files:
-        src = font_src / font_file
-        dest = bedrock_structure["textures_font"] / font_file
-        shutil.copy2(src, dest)
-        fonts_converted["files"].append(font_file)
-        logger.info(f"  ├─ Sao chép: {font_file}")
-    
-    # Tạo font definition
-    font_def = create_font_definition(font_files)
-    font_def_path = bedrock_structure["root"] / "font"
-    font_def_path.mkdir(parents=True, exist_ok=True)
-    
-    with open(font_def_path / "default.json", 'w', encoding='utf-8') as f:
-        json.dump(font_def, f, indent=2, ensure_ascii=False)
-    
-    logger.success(f"Chuyển đổi {len(font_files)} font files")
-    
-    if not HAS_PILLOW:
-        logger.warning(
-            "Pillow không được cài đặt. Glyph coordinates được thiết lập mặc định.\n"
-            "          Để chuyển đổi chính xác, cài đặt Pillow: pip install Pillow"
-        )
-    
-    return fonts_converted
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# PHẦN 5: CHUYỂN ĐỔI SOUNDS
-# ═══════════════════════════════════════════════════════════════════════════
-
-def read_java_sounds_json(java_pack_path: Path) -> Dict[str, Any]:
-    """
-    Đọc file sounds.json từ Java Resource Pack.
-    
-    === SOUNDS.JSON JAVA ===
-    
-    Cấu trúc:
-      {
-        "entity.player.hurt": {
-          "sounds": [
-            "damage/hit1",
-            "damage/hit2",
-            "damage/hit3"
-          ],
-          "subtitle": "subtitles.player.hurt"
-        }
-      }
-    
-    Args:
-        java_pack_path: Path Java Resource Pack
-    
-    Returns:
-        Dict chứa sounds definition hoặc {}
-    """
-    sounds_file = java_pack_path / "assets" / "minecraft" / "sounds.json"
-    
-    if not sounds_file.exists():
-        logger.warning(f"Không tìm thấy sounds.json: {sounds_file}")
+def _0xRJS(_0x5a):
+    _0x5b = _0x5a / "\x61\x73\x73\x65\x74\x73" / "\x6d\x69\x6e\x65\x63\x72\x61\x66\x74" / "\x73\x6f\x75\x6e\x64\x73\x2e\x6a\x73\x6f\x6e"
+    if not _0x5b.exists():
         return {}
-    
     try:
-        with open(sounds_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Lỗi đọc sounds.json: {e}")
+        with open(_0x5b, '\x72', encoding='\x75\x74\x66\x2d\x38') as _0xf:
+            return _0xjson.load(_0xf)
+    except Exception:
         return {}
 
-
-def convert_sounds_json(java_sounds: Dict[str, Any], 
-                       bedrock_structure: Dict[str, Path]) -> Dict[str, Any]:
-    """
-    Chuyển đổi sounds.json từ Java sang sound_definitions.json của Bedrock.
-    
-    === SOUNDS TRONG JAVA vs BEDROCK ===
-    
-    Java Format:
-      {
-        "event.name": {
-          "sounds": ["path/to/sound1", "path/to/sound2"],
-          "subtitle": "key.subtitle"
-        }
-      }
-    
-    Bedrock Format:
-      {
-        "event.name": {
-          "sounds": [
-            {"name": "sound/path/file", "load_on_open": true}
-          ],
-          "category": "master",
-          "subtitle": "key.subtitle"
-      }
-    
-    Khác biệt chính:
-      1. Bedrock yêu cầu trường "category" (master, music, record, weather, ...)
-      2. Sound paths cần khác (relative từ sounds/ directory)
-      3. Bedrock dùng object trong "sounds" array, Java dùng string
-      4. GeyserMC sẽ convert category sang Bedrock equivalents
-    
-    Args:
-        java_sounds: Dict từ Java sounds.json
-        bedrock_structure: Dict cấu trúc Bedrock
-    
-    Returns:
-        Dict sound_definitions Bedrock
-    """
-    
-    logger.explain(
-        "Sounds: Java vs Bedrock",
-        "Java: Đơn giản - event → array của sound files\n"
-        "Bedrock: Cần category (master, music, record...)\n"
-        "GeyserMC: Chuyển category để phát đúng loại âm thanh"
-    )
-    
-    bedrock_sounds = {}
-    
-    # Danh sách category Bedrock
-    category_mapping = {
-        "ambient": "ambient",
-        "block": "master",
-        "damage": "master",
-        "entity": "master",
-        "event": "master",
-        "music": "music",
-        "player": "master",
-        "record": "record",
-        "step": "master",
-        "weather": "weather"
+def _0xCSJ(_0x5c, _0x5d):
+    _0x5e = {}
+    _0x5f = {
+        "\x61\x6d\x62\x69\x65\x6e\x74": "\x61\x6d\x62\x69\x65\x6e\x74",
+        "\x62\x6c\x6f\x63\x6b": "\x6d\x61\x73\x74\x65\x72",
+        "\x64\x61\x6d\x61\x67\x65": "\x6d\x61\x73\x74\x65\x72",
+        "\x65\x6e\x74\x69\x74\x79": "\x6d\x61\x73\x74\x65\x72",
+        "\x65\x76\x65\x6e\x74": "\x6d\x61\x73\x74\x65\x72",
+        "\x6d\x75\x73\x69\x63": "\x6d\x75\x73\x69\x63",
+        "\x70\x6c\x61\x79\x65\x72": "\x6d\x61\x73\x74\x65\x72",
+        "\x72\x65\x63\x6f\x72\x64": "\x72\x65\x63\x6f\x72\x64",
+        "\x73\x74\x65\x70": "\x6d\x61\x73\x74\x65\x72",
+        "\x77\x65\x61\x74\x68\x65\x72": "\x77\x65\x61\x74\x68\x65\x72"
     }
-    
-    for event_name, event_data in java_sounds.items():
-        # Xác định category dựa trên tên event
-        category = "master"
-        for prefix, cat in category_mapping.items():
-            if event_name.startswith(prefix):
-                category = cat
+    for _0x60, _0x61 in _0x5c.items():
+        _0x62 = "\x6d\x61\x73\x74\x65\x72"
+        for _0x63, _0x64 in _0x5f.items():
+            if _0x60.startswith(_0x63):
+                _0x62 = _0x64
                 break
-        
-        # Chuyển đổi sounds array
-        bedrock_sounds_list = []
-        if "sounds" in event_data:
-            for sound in event_data["sounds"]:
-                # Xử lý trường hợp sound là string hoặc object
-                if isinstance(sound, str):
-                    sound_path = sound
-                else:
-                    sound_path = sound.get("name", sound)
-                
-                # Tạo sound object Bedrock
-                bedrock_sounds_list.append({
-                    "name": f"sounds/{sound_path}",
-                    "load_on_open": True
-                })
-        
-        # Tạo entry Bedrock
-        bedrock_sounds[event_name] = {
-            "sounds": bedrock_sounds_list,
-            "category": category
-        }
-        
-        # Copy subtitle nếu có
-        if "subtitle" in event_data:
-            bedrock_sounds[event_name]["subtitle"] = event_data["subtitle"]
-    
-    return bedrock_sounds
+        _0x65 = []
+        if "\x73\x6f\x75\x6e\x64\x73" in _0x61:
+            for _0x66 in _0x61["\x73\x6f\x75\x6e\x64\x73"]:
+                _0x67 = _0x66 if isinstance(_0x66, str) else _0x66.get("\x6e\x61\x6d\x65", _0x66)
+                _0x65.append({"\x6e\x61\x6d\x65": f"\x73\x6f\x75\x6e\x64\x73\x2f{_0x67}", "\x6c\x6f\x61\x64\x5f\x6f\x6e\x5f\x6f\x70\x65\x6e": True})
+        _0x5e[_0x60] = {"\x73\x6f\x75\x6e\x64\x73": _0x65, "\x63\x61\x74\x65\x67\x6f\x72\x79": _0x62}
+        if "\x73\x75\x62\x74\x69\x74\x6c\x65" in _0x61:
+            _0x5e[_0x60]["\x73\x75\x62\x74\x69\x74\x6c\x65"] = _0x61["\x73\x75\x62\x74\x69\x74\x6c\x65"]
+    return _0x5e
 
+def _0xSCS(_0x68, _0x69):
+    _0x6a = _0x68 / "\x61\x73\x73\x65\x74\x73" / "\x6d\x69\x6e\x65\x63\x72\x61\x66\x74" / "\x73\x6f\x75\x6e\x64\x73"
+    _0x6b = _0x69["\x73\x6f\x75\x6e\x64\x73"]
+    if not _0x6a.exists():
+        return 0x00
+    _0x6c = 0x00
+    for _0x6d in _0x6a.rglob("\x2a\x2e\x6f\x67\x67"):
+        _0x6e = _0x6d.relative_to(_0x6a)
+        _0x6f = _0x6b / _0x6e.parent
+        _0x6f.mkdir(parents=True, exist_ok=True)
+        _0shutil.copy2(_0x6d, _0x6f / _0x6d.name)
+        _0x6c += 0x01
+    return _0x6c
 
-def scan_and_copy_sounds(java_pack_path: Path, 
-                        bedrock_structure: Dict[str, Path]) -> int:
-    """
-    Quét và sao chép sound files từ Java sang Bedrock.
-    
-    Args:
-        java_pack_path: Path Java Resource Pack
-        bedrock_structure: Dict cấu trúc Bedrock
-    
-    Returns:
-        Số file đã sao chép
-    """
-    java_sounds_dir = java_pack_path / "assets" / "minecraft" / "sounds"
-    bedrock_sounds_dir = bedrock_structure["sounds"]
-    
-    if not java_sounds_dir.exists():
-        logger.warning(f"Thư mục sounds không tồn tại: {java_sounds_dir}")
-        return 0
-    
-    copied = 0
-    
-    # Sao chép tất cả .ogg files
-    for ogg_file in java_sounds_dir.rglob("*.ogg"):
-        # Giữ nguyên cấu trúc thư mục
-        relative_path = ogg_file.relative_to(java_sounds_dir)
-        dest_dir = bedrock_sounds_dir / relative_path.parent
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        
-        dest = dest_dir / ogg_file.name
-        shutil.copy2(ogg_file, dest)
-        copied += 1
-    
-    logger.info(f"  └─ Sao chép {copied} file âm thanh")
-    return copied
+def _0xCSD(_0x70, _0x71, _0x72):
+    _0xlogger.step("\x50\x72\x6f\x63\x65\x73\x73\x69\x6e\x67\x20\x53\x6f\x75\x6e\x64\x73")
+    _0x73 = _0xRJS(_0x70)
+    _0x74 = {"\x74\x6f\x74\x61\x6c\x5f\x65\x76\x65\x6e\x74\x73": len(_0x73), "\x66\x69\x6c\x65\x73\x5f\x63\x6f\x70\x69\x65\x64": 0x00}
+    if not _0x73:
+        return _0x74
+    _0x75 = _0xCSJ(_0x73, _0x71)
+    _0x76 = _0xSCS(_0x70, _0x71)
+    _0x74["\x66\x69\x6c\x65\x73\x5f\x63\x6f\x70\x69\x65\x64"] = _0x76
+    _0x77 = _0x71["\x72\x6f\x6f\x74"] / "\x73\x6f\x75\x6e\x64\x5f\x64\x65\x66\x69\x6e\x69\x74\x69\x6f\x6e\x73\x2e\x6a\x73\x6f\x6e"
+    with open(_0x77, '\x77', encoding='\x75\x74\x66\x2d\x38') as _0xf:
+        _0xjson.dump({"\x73\x6f\x75\x6e\x64\x5f\x64\x65\x66\x69\x6e\x69\x74\x69\x6f\x6e\x73": _0x75}, _0xf, indent=0x02, ensure_ascii=False)
+    return _0x74
 
-
-def convert_sounds(java_pack_path: Path, bedrock_structure: Dict[str, Path],
-                   custom_mappings: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Chuyển đổi Sounds từ Java sang Bedrock.
-    
-    === QUY TRÌNH CHUYỂN ĐỔI SOUNDS ===
-    
-    1. Đọc sounds.json từ Java
-    2. Chuyển đổi cấu trúc:
-       - Thêm trường "category" (xác định loại âm thanh)
-       - Chuyển sound paths sang format Bedrock
-       - Chuyển từ array string sang array object
-    3. Sao chép tất cả .ogg files từ assets/minecraft/sounds/
-    4. Ghi file sound_definitions.json trong Bedrock root
-    5. GeyserMC sẽ đọc file này và phát âm thanh phù hợp
-    
-    Args:
-        java_pack_path: Path Java Resource Pack
-        bedrock_structure: Dict cấu trúc Bedrock
-        custom_mappings: Dict để lưu info
-    
-    Returns:
-        Dict thông tin sounds đã convert
-    """
-    logger.step("Chuyển đổi Sounds & Music")
-    
-    # Đọc Java sounds.json
-    java_sounds = read_java_sounds_json(java_pack_path)
-    
-    sounds_converted = {
-        "total_events": len(java_sounds),
-        "files_copied": 0
+def _0xSCM(_0x78, _0x79):
+    _0xlogger.step("\x57\x72\x69\x74\x69\x6e\x67\x20\x4d\x61\x70\x70\x69\x6e\x67\x73")
+    _0x7a = {
+        "\x76\x65\x72\x73\x69\x6f\x6e": "\x31\x2e\x30\x2e\x30",
+        "\x66\x6f\x72\x6d\x61\x74\x5f\x76\x65\x72\x73\x69\x6f\x6e": "\x31\x2e\x30\x2e\x30",
+        "\x64\x65\x73\x63\x72\x69\x70\x74\x69\x6f\x6e": "\x4f\x62\x66\x75\x73\x63\x61\x74\x65\x64\x20\x4d\x61\x70\x70\x69\x6e\x67\x73",
+        "\x6d\x61\x70\x70\x69\x6e\x67\x73": _0x78
     }
-    
-    if not java_sounds:
-        logger.info("Không tìm thấy sounds.json hoặc nó rỗng")
-        return sounds_converted
-    
-    # Chuyển đổi
-    bedrock_sounds = convert_sounds_json(java_sounds, bedrock_structure)
-    
-    logger.info(f"  ├─ Chuyển đổi {len(bedrock_sounds)} sound events")
-    
-    # Sao chép sound files
-    files_copied = scan_and_copy_sounds(java_pack_path, bedrock_structure)
-    sounds_converted["files_copied"] = files_copied
-    
-    # Ghi sound_definitions.json
-    sound_def_path = bedrock_structure["root"] / "sound_definitions.json"
-    with open(sound_def_path, 'w', encoding='utf-8') as f:
-        json.dump({"sound_definitions": bedrock_sounds}, f, indent=2, ensure_ascii=False)
-    
-    logger.success(f"Chuyển đổi {len(bedrock_sounds)} sound events, sao chép {files_copied} files")
-    
-    return sounds_converted
+    _0x7b = _0x79["\x72\x6f\x6f\x74"] / "\x63\x75\x73\x74\x6f\x6d\x5f\x6d\x61\x70\x70\x69\x6e\x67\x73\x2e\x6a\x73\x6f\x6e"
+    with open(_0x7b, '\x77', encoding='\x75\x74\x66\x2d\x38') as _0xf:
+        _0xjson.dump(_0x7a, _0xf, indent=0x02, ensure_ascii=False)
 
+def _0xCSR(_0x7c, _0x7d):
+    _0xlogger.step("\x47\x65\x6e\x65\x72\x61\x74\x69\x6e\x67\x20\x52\x65\x70\x6f\x72\x74")
+    _0x7e = f"\x53\x55\x4d\x4d\x41\x52\x59\x20\x43\x4f\x4e\x56\x45\x52\x53\x49\x4f\x4e\x20\x52\x45\x50\x4f\x52\x54\x0a\x3d\x3d\x3d\x3d\x3d\x3d\x3d\x3d\x3d\x3d\x3d\x3d\x3d\x3d\x3d\x0a\x54\x61\x72\x67\x65\x74\x3a\x20{_0x7c}\x0a"
+    _0x7f = _0x7c / "\x43\x4f\x4e\x56\x45\x52\x53\x49\x4f\x4e\x5f\x52\x45\x50\x4f\x52\x54\x2e\x74\x78\x74"
+    with open(_0x7f, '\x77', encoding='\x75\x74\x66\x2d\x38') as _0xf:
+        _0xf.write(_0x7e)
+    print(_0x7e)
 
-# ═══════════════════════════════════════════════════════════════════════════
-# PHẦN 6: GỬI FILE CUSTOM_MAPPINGS & HOÀN THÀNH
-# ═══════════════════════════════════════════════════════════════════════════
-
-def save_custom_mappings(custom_mappings: Dict[str, Any], 
-                        bedrock_structure: Dict[str, Path]) -> None:
-    """
-    Ghi file custom_mappings.json cho GeyserMC.
+def _0xMAIN(_0x80, _0x81="\x2e\x2f\x62\x65\x64\x72\x6f\x63\x6b\x5f\x70\x61\x63\x6b\x73", _0x82="\x63\x6f\x6e\x76\x65\x72\x74\x65\x64\x5f\x70\x61\x63\x6b"):
+    _0xlogger.separator("\x2a")
+    _0xlogger.set_total_steps(0x07)
     
-    === CUSTOM_MAPPINGS.JSON - FILE QUAN TRỌNG ===
-    
-    File này là "từ điển" giúp GeyserMC hiểu cách convert Java items sang Bedrock:
-    
-      {
-        "version": "1.0.0",
-        "description": "Custom mappings for GeyserMC",
-        "java_cmd": {
-          "diamond_sword_1": {
-            "java_item": "minecraft:diamond_sword",
-            "custom_model_data": 1,
-            "bedrock_virtual_id": "item.geyser.diamond_sword_1"
-          }
-        },
-        "custom_armor": {...},
-        "custom_fonts": {...}
-      }
-    
-    GeyserMC Plugin sẽ:
-      1. Load file này lúc khởi động
-      2. Khi player nhận item từ Java server với CustomModelData, tra cứu mapping
-      3. Gửi Bedrock client tương ứng virtual item ID
-      4. Bedrock client render với texture từ resource pack này
-    
-    Args:
-        custom_mappings: Dict chứa tất cả mappings
-        bedrock_structure: Dict cấu trúc Bedrock
-    """
-    
-    logger.step("Ghi File custom_mappings.json cho GeyserMC")
-    
-    logger.explain(
-        "File custom_mappings.json",
-        "Đây là \"khoá dịch\" giúp GeyserMC chuyển đổi\n"
-        "Java items (với CMD) → Bedrock items\n"
-        "GeyserMC load file này lúc khởi động server"
-    )
-    
-    # Thêm metadata
-    output = {
-        "version": "1.0.0",
-        "format_version": "1.0.0",
-        "description": "Custom Resource Pack Mappings for GeyserMC Java Bridge",
-        "created_by": "Minecraft Resource Pack Converter v1.0.0",
-        "mappings": custom_mappings
-    }
-    
-    # Ghi file
-    mapping_path = bedrock_structure["root"] / "custom_mappings.json"
-    with open(mapping_path, 'w', encoding='utf-8') as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
-    
-    logger.success(f"Ghi file custom_mappings.json")
-    logger.info(f"  └─ Vị trí: {mapping_path}")
-    logger.info(f"  └─ Kích thước: {mapping_path.stat().st_size / 1024:.2f} KB")
-
-
-def create_summary_report(bedrock_pack_path: Path, conversion_results: Dict[str, Any]) -> None:
-    """
-    Tạo file báo cáo tóm tắt chuyển đổi.
-    
-    Args:
-        bedrock_pack_path: Path Bedrock pack
-        conversion_results: Dict kết quả conversion
-    """
-    
-    logger.step("Tạo Báo Cáo Tóm Tắt")
-    
-    report = f"""
-╔════════════════════════════════════════════════════════════════════════════╗
-║            MINECRAFT RESOURCE PACK CONVERSION - SUMMARY REPORT             ║
-╚════════════════════════════════════════════════════════════════════════════╝
-
-📦 OUTPUT BEDROCK RESOURCE PACK
-  └─ Vị trí: {bedrock_pack_path}
-
-✅ CONVERSION RESULTS:
-
-  1️⃣  Items & Custom Model Data (CMD)
-      Total items: {conversion_results['items'].get('total', 0)}
-      Textures copied: {conversion_results['items'].get('texture_copied', 0)}
-      Status: {'✓ Success' if conversion_results['items'].get('total', 0) > 0 else '⊘ Skipped'}
-
-  2️⃣  Custom Armor & Attachables
-      Total armor: {conversion_results['armor'].get('total', 0)}
-      Textures copied: {conversion_results['armor'].get('texture_copied', 0)}
-      Attachables created: {conversion_results['armor'].get('total', 0)}
-      Status: {'✓ Success' if conversion_results['armor'].get('total', 0) > 0 else '⊘ Skipped'}
-
-  3️⃣  Fonts & Emojis
-      Font files: {conversion_results['fonts'].get('total', 0)}
-      Status: {'✓ Success' if conversion_results['fonts'].get('total', 0) > 0 else '⊘ Skipped'}
-      Note: {'Manual glyph adjustment may be needed' if conversion_results['fonts'].get('requires_manual_adjustment') else 'Auto-generated'}
-
-  4️⃣  Sounds & Music
-      Sound events: {conversion_results['sounds'].get('total_events', 0)}
-      Sound files: {conversion_results['sounds'].get('files_copied', 0)}
-      Status: {'✓ Success' if conversion_results['sounds'].get('total_events', 0) > 0 else '⊘ Skipped'}
-
-📋 GENERATED FILES:
-  ✓ manifest.json             → Bedrock pack metadata
-  ✓ custom_mappings.json      → GeyserMC mappings
-  ✓ sound_definitions.json    → Bedrock sounds config
-  ✓ attachables/*.json        → Armor definitions
-  ✓ textures/items/           → Item textures
-  ✓ textures/models/armor/    → Armor textures
-  ✓ textures/font/            → Font/emoji textures
-  ✓ sounds/                   → Sound OGG files
-
-🔧 NEXT STEPS:
-
-  1. Copy entire '{bedrock_pack_path.name}' folder to:
-     → .../server/plugins/Geyser-Spigot/packs/
-     (or appropriate Geyser plugin directory for your version)
-
-  2. Restart Geyser plugin:
-     /geyser reload
-
-  3. Connect Bedrock client:
-     → Connect to Java server through Geyser proxy
-     → Resource pack should auto-load on login
-
-⚠️  IMPORTANT NOTES:
-
-  • This converter creates BASIC mappings. For perfect conversion:
-    - Some JSON files may need manual review (geometry.json, animations)
-    - Font glyphs should be verified in-game
-    - Custom model data mappings may need adjustment based on your items
-
-  • File Locations Expected by GeyserMC:
-    - custom_mappings.json must be readable by Geyser plugin
-    - Manifest.json validates the resource pack structure
-    - All paths in mappings must be correct (case-sensitive on Linux)
-
-  • Troubleshooting:
-    - Check Geyser plugin logs for loading errors
-    - Verify manifest.json has valid UUIDs
-    - Ensure all referenced texture files exist
-    - Test with one item first before full migration
-
-════════════════════════════════════════════════════════════════════════════
-
-Generated by Minecraft Resource Pack Converter v1.0.0
-Report created: {__import__('datetime').datetime.now().isoformat()}
-"""
-    
-    report_path = bedrock_pack_path / "CONVERSION_REPORT.txt"
-    with open(report_path, 'w', encoding='utf-8') as f:
-        f.write(report)
-    
-    print(report)
-    logger.success(f"Báo cáo được lưu: {report_path}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# PHẦN 7: MAIN FUNCTION - ĐIỀU PHỐI TOÀN BỘ QUUY TRÌNH
-# ═══════════════════════════════════════════════════════════════════════════
-
-def main(java_pack_path: str, output_base_path: str = "./bedrock_packs", 
-         pack_name: str = "converted_pack"):
-    """
-    Hàm chính điều phối toàn bộ quuy trình chuyển đổi.
-    
-    Args:
-        java_pack_path: Đường dẫn đến Java Resource Pack
-        output_base_path: Thư mục gốc để tạo Bedrock pack
-        pack_name: Tên folder Bedrock pack (không có spaces)
-    """
-    
-    print("\n")
-    logger.separator("═")
-    print("╔════════════════════════════════════════════════════════════════════════════╗")
-    print("║       MINECRAFT JAVA → BEDROCK RESOURCE PACK CONVERTER (GeyserMC)          ║")
-    print("║                          Phiên bản 1.0.0                                   ║")
-    print("╚════════════════════════════════════════════════════════════════════════════╝")
-    logger.separator("═")
-    
-    # Thiết lập logger
-    logger.set_total_steps(7)
-    
-    # BƯỚC 1: Validate input
-    logger.step("Xác nhận Java Resource Pack")
-    if not validate_input_directory(java_pack_path):
-        logger.error("Xác nhận thất bại. Hủy bỏ.")
+    _0xlogger.step("\x5b\x31\x5d\x20\x56\x61\x6c\x69\x64\x61\x74\x69\x6e\x67")
+    if not _0xVLD(_0x80):
         return False
     
-    java_pack_path = Path(java_pack_path)
-    java_pack_name = java_pack_path.name
+    _0x83 = _Path(_0x80)
+    _0x84 = _0x83.name
     
-    # BƯỚC 2: Tạo cấu trúc Bedrock
-    logger.step("Tạo Cấu Trúc Bedrock Resource Pack")
-    output_path = Path(output_base_path) / pack_name
-    bedrock_structure = create_bedrock_structure(str(output_path))
+    _0xlogger.step("\x5b\x32\x5d\x20\x53\x74\x72\x75\x63\x74\x75\x72\x69\x6e\x67")
+    _0x85 = _Path(_0x81) / _0x82
+    _0x86 = _0xCBS(str(_0x85))
     
-    # BƯỚC 3: Tạo manifest.json
-    logger.step("Tạo File Manifest.json")
-    manifest = generate_manifest(output_path, java_pack_name)
-    logger.info(f"Manifest format version: {manifest['format_version']}")
+    _0xlogger.step("\x5b\x33\x5d\x20\x4d\x61\x6e\x69\x66\x65\x73\x74\x69\x6e\x67")
+    _0x87 = _0xGMN(_0x85, _0x84)
     
-    # BƯỚC 4: Chuẩn bị custom_mappings dict
-    custom_mappings = {
-        "metadata": {
-            "version": "1.0.0",
-            "source_pack": java_pack_name
-        }
-    }
+    _0x88 = {"\x6d\x65\x74\x61\x64\x61\x74\x61": {"\x76\x65\x72\x73\x69\x6f\x6e": "\x31\x2e\x30\x2e\x30", "\x73\x6f\x75\x72\x63\x65": _0x84}}
     
-    # BƯỚC 5: Chuyển đổi từng loại tài nguyên
-    logger.step("Chuyển Đổi Items & Custom Model Data")
-    items_results = convert_items(java_pack_path, bedrock_structure, custom_mappings)
+    _0xlogger.step("\x5b\x34\x5d\x20\x49\x74\x65\x6d\x73")
+    _0x89 = _0xCIT(_0x83, _0x86, _0x88)
     
-    logger.step("Chuyển Đổi Custom Armor & Attachables")
-    armor_results = convert_armor(java_pack_path, bedrock_structure, custom_mappings)
+    _0xlogger.step("\x5b\x35\x5d\x20\x41\x72\x6d\x6f\x72")
+    _0x8a = _0xCAR(_0x83, _0x86, _0x88)
     
-    logger.step("Chuyển Đổi Fonts & Emojis")
-    fonts_results = convert_fonts(java_pack_path, bedrock_structure, custom_mappings)
+    _0xlogger.step("\x5b\x36\x5d\x20\x41\x75\x64\x69\x6f\x20\x26\x20\x46\x6f\x6e\x74")
+    _0x8b = _0xCFT(_0x83, _0x86, _0x88)
+    _0x8c = _0xCSD(_0x83, _0x86, _0x88)
     
-    logger.step("Chuyển Đổi Sounds & Music")
-    sounds_results = convert_sounds(java_pack_path, bedrock_structure, custom_mappings)
+    _0xlogger.step("\x5b\x37\x5d\x20\x4d\x61\x70\x70\x69\x6e\x67")
+    _0xSCM(_0x88, _0x86)
     
-    # BƯỚC 6: Lưu custom_mappings
-    logger.step("Ghi File custom_mappings.json")
-    save_custom_mappings(custom_mappings, bedrock_structure)
+    _0x8d = {"\x69\x74\x65\x6d\x73": _0x89, "\x61\x72\x6d\x6f\x72": _0x8a, "\x66\x6f\x6e\x74\x73": _0x8b, "\x73\x6f\x75\x6e\x64\x73": _0x8c}
+    _0xCSR(_0x85, _0x8d)
     
-    # BƯỚC 7: Báo cáo
-    logger.step("Tạo Báo Cáo & Hoàn Thành")
-    
-    conversion_results = {
-        "items": items_results,
-        "armor": armor_results,
-        "fonts": fonts_results,
-        "sounds": sounds_results
-    }
-    
-    create_summary_report(output_path, conversion_results)
-    
-    logger.separator("═")
-    print("╔════════════════════════════════════════════════════════════════════════════╗")
-    print("║                        ✅ CONVERSION COMPLETED!                            ║")
-    print("╚════════════════════════════════════════════════════════════════════════════╝")
-    logger.info(f"\n📁 Bedrock Resource Pack: {output_path}")
-    logger.info(f"📋 Để sử dụng với GeyserMC:")
-    logger.info(f"   1. Copy toàn bộ thư mục '{pack_name}' đến plugins/Geyser-Spigot/packs/")
-    logger.info(f"   2. Restart server hoặc /geyser reload")
-    logger.info(f"   3. Connect Bedrock client - pack sẽ auto-load")
-    
-    print("\n")
+    _0xlogger.separator("\x2a")
     return True
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# ENTRY POINT
-# ═══════════════════════════════════════════════════════════════════════════
-
-if __name__ == "__main__":
-    """
-    Script entry point. Có thể chạy qua command line hoặc import.
-    
-    Cách sử dụng:
-      
-      # 1. Chạy từ command line:
-      python3 minecraft_resourcepack_converter.py /path/to/java/pack output_folder pack_name
-      
-      # 2. Hoặc sử dụng default paths:
-      python3 minecraft_resourcepack_converter.py ~/Downloads/MyPack
-      
-      # 3. Import vào script khác:
-      from minecraft_resourcepack_converter import main
-      main("./java_pack", "./bedrock_packs", "my_converted_pack")
-    """
-    
-    if len(sys.argv) < 2:
-        # Chế độ demo - yêu cầu user nhập
-        print("\n" + "="*80)
-        print("MINECRAFT RESOURCE PACK CONVERTER - Interactive Mode")
-        print("="*80 + "\n")
-        
-        java_path = input("📁 Nhập đường dẫn Java Resource Pack: ").strip()
-        output_path = input("📁 Nhập đường dẫn output [./bedrock_packs]: ").strip() or "./bedrock_packs"
-        pack_name = input("📝 Nhập tên pack [converted_pack]: ").strip() or "converted_pack"
-        
-        # Làm sạch pack_name (không được có spaces)
-        pack_name = pack_name.replace(" ", "_")
-        
-        success = main(java_path, output_path, pack_name)
-        sys.exit(0 if success else 1)
-    
+if __name__ == "\x5f\x5f\x6d\x61\x69\x6e\x5f\x5f":
+    if len(_sys.argv) < 0x02:
+        _0x8e = input("\x4a\x61\x76\x61\x20\x50\x61\x73\x68\x3a\x20").strip()
+        _0x8f = input("\x4f\x75\x74\x70\x75\x74\x20\x50\x61\x74\x68\x3a\x20").strip() or "\x2e\x2f\x62\x65\x64\x72\x6f\x63\x6b\x5f\x70\x61\x63\x6b\x73"
+        _0x90 = input("\x50\x61\x63\x6b\x20\x4e\x61\x6d\x65\x3a\x20").strip() or "\x63\x6f\x6e\x76\x65\x72\x74\x65\x64\x5f\x70\x61\x63\x6b"
+        _0x90 = _0x90.replace("\x20", "\x5f")
+        _0x91 = _0xMAIN(_0x8e, _0x8f, _0x90)
+        _sys.exit(0x00 if _0x91 else 0x01)
     else:
-        # Chế độ command line arguments
-        java_path = sys.argv[1]
-        output_path = sys.argv[2] if len(sys.argv) > 2 else "./bedrock_packs"
-        pack_name = sys.argv[3] if len(sys.argv) > 3 else "converted_pack"
-        
-        pack_name = pack_name.replace(" ", "_")
-        
-        success = main(java_path, output_path, pack_name)
-        sys.exit(0 if success else 1)
+        _0x8e = _sys.argv[0x01]
+        _0x8f = _sys.argv[0x02] if len(_sys.argv) > 0x02 else "\x2e\x2f\x62\x65\x64\x72\x6f\x63\x6b\x5f\x70\x61\x63\x6b\x73"
+        _0x90 = _sys.argv[0x03] if len(_sys.argv) > 0x03 else "\x63\x6f\x6e\x76\x65\x72\x74\x65\x64\x5f\x70\x61\x63\x6b"
+        _0x90 = _0x90.replace("\x20", "\x5f")
+        _0x91 = _0xMAIN(_0x8e, _0x8f, _0x90)
+        _sys.exit(0x00 if _0x91 else 0x01)
