@@ -17,7 +17,6 @@ với tối ưu hoàn toàn cho plugin GeyserMC. Script bao gồm:
   ✓ Chuyển đổi Sounds & Music
   ✓ Log chi tiết bằng tiếng Việt (hướng dẫn & giải thích)
 
-Tác giả: Claude @ Anthropic
 Yêu cầu: Python 3.8+, Pillow (PIL) cho xử lý ảnh
 """
 
