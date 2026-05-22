@@ -15,6 +15,7 @@
 - ✅ Xử lý animation (flipbook) từ `.png.mcmeta`
 - ✅ Tự động kiểm tra và sửa lỗi pack sau merge
 - ✅ Giao diện dòng lệnh (CLI) đẹp, log chi tiết bằng tiếng Việt
+- Chưa Phát Hành
 
 ---
 
