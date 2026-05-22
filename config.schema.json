@@ -1,0 +1,367 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Minecraft Resource Pack Converter Configuration",
+  "description": "Configuration file for advanced conversion settings",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Conversion metadata",
+      "properties": {
+        "author": {
+          "type": "string",
+          "description": "Author of the resource pack",
+          "example": "MyName"
+        },
+        "version": {
+          "type": "string",
+          "description": "Resource pack version",
+          "example": "1.0.0"
+        },
+        "description": {
+          "type": "string",
+          "description": "Pack description",
+          "example": "My awesome converted pack"
+        }
+      }
+    },
+    "conversion_settings": {
+      "type": "object",
+      "description": "Conversion behavior settings",
+      "properties": {
+        "format_version": {
+          "type": "integer",
+          "description": "Bedrock manifest format version",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 5
+        },
+        "include_items": {
+          "type": "boolean",
+          "description": "Convert items and custom model data",
+          "default": true
+        },
+        "include_armor": {
+          "type": "boolean",
+          "description": "Convert custom armor and attachables",
+          "default": true
+        },
+        "include_sounds": {
+          "type": "boolean",
+          "description": "Convert sounds and music",
+          "default": true
+        },
+        "include_fonts": {
+          "type": "boolean",
+          "description": "Convert fonts and emojis",
+          "default": true
+        },
+        "include_textures": {
+          "type": "boolean",
+          "description": "Copy texture files",
+          "default": true
+        },
+        "optimize_textures": {
+          "type": "boolean",
+          "description": "Optimize PNG files (requires Pillow)",
+          "default": false
+        },
+        "texture_quality": {
+          "type": "integer",
+          "description": "JPEG quality for optimized textures (0-100)",
+          "default": 95,
+          "minimum": 70,
+          "maximum": 100
+        }
+      }
+    },
+    "category_mapping": {
+      "type": "object",
+      "description": "Sound event to Bedrock category mapping",
+      "default": {
+        "ambient": "ambient",
+        "block": "master",
+        "damage": "master",
+        "entity": "master",
+        "event": "master",
+        "music": "music",
+        "player": "master",
+        "record": "record",
+        "step": "master",
+        "weather": "weather"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["ambient", "master", "music", "record", "weather", "block", "hostile", "neutral", "player", "weather"]
+      }
+    },
+    "output_settings": {
+      "type": "object",
+      "description": "Output generation settings",
+      "properties": {
+        "create_zip_package": {
+          "type": "boolean",
+          "description": "Create .mcpack ZIP file",
+          "default": false
+        },
+        "generate_summary_report": {
+          "type": "boolean",
+          "description": "Generate CONVERSION_REPORT.txt",
+          "default": true
+        },
+        "generate_json_schema": {
+          "type": "boolean",
+          "description": "Generate schema documentation",
+          "default": false
+        },
+        "verbose_logging": {
+          "type": "boolean",
+          "description": "Enable verbose logging output",
+          "default": true
+        },
+        "log_file": {
+          "type": "string",
+          "description": "Optional log file path",
+          "example": "./converter.log"
+        }
+      }
+    },
+    "geysermc_settings": {
+      "type": "object",
+      "description": "GeyserMC specific settings",
+      "properties": {
+        "generate_custom_mappings": {
+          "type": "boolean",
+          "description": "Generate custom_mappings.json for GeyserMC",
+          "default": true
+        },
+        "mapping_format_version": {
+          "type": "string",
+          "description": "Version of custom_mappings.json format",
+          "default": "1.0.0"
+        },
+        "enable_virtual_items": {
+          "type": "boolean",
+          "description": "Create virtual items for custom model data",
+          "default": true
+        },
+        "auto_detect_cmd": {
+          "type": "boolean",
+          "description": "Auto-detect custom_model_data from JSON overrides",
+          "default": true
+        }
+      }
+    },
+    "exclusions": {
+      "type": "object",
+      "description": "Resources to exclude from conversion",
+      "properties": {
+        "excluded_items": {
+          "type": "array",
+          "description": "Item names to skip (regex patterns supported)",
+          "default": [],
+          "items": {
+            "type": "string",
+            "example": "^debug_.*"
+          }
+        },
+        "excluded_sounds": {
+          "type": "array",
+          "description": "Sound events to skip",
+          "default": [],
+          "items": {
+            "type": "string",
+            "example": "debug.sound"
+          }
+        },
+        "excluded_folders": {
+          "type": "array",
+          "description": "Folders to skip during conversion",
+          "default": [
+            ".git",
+            "__pycache__",
+            ".DS_Store"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "attachment_settings": {
+      "type": "object",
+      "description": "Settings for armor and attachables",
+      "properties": {
+        "generate_geometry": {
+          "type": "boolean",
+          "description": "Auto-generate geometry.json for armor",
+          "default": true
+        },
+        "geometry_version": {
+          "type": "string",
+          "description": "Geometry format version",
+          "default": "1.12.0"
+        },
+        "include_render_controllers": {
+          "type": "boolean",
+          "description": "Include render controllers in attachables",
+          "default": true
+        }
+      }
+    },
+    "font_settings": {
+      "type": "object",
+      "description": "Font and emoji conversion settings",
+      "properties": {
+        "auto_detect_glyphs": {
+          "type": "boolean",
+          "description": "Auto-detect glyph coordinates from PNG (requires Pillow)",
+          "default": true
+        },
+        "glyph_scan_method": {
+          "type": "string",
+          "enum": ["simple", "advanced", "manual"],
+          "description": "Method for glyph detection",
+          "default": "simple"
+        },
+        "default_glyph_width": {
+          "type": "integer",
+          "description": "Default glyph width in pixels",
+          "default": 8
+        },
+        "default_glyph_height": {
+          "type": "integer",
+          "description": "Default glyph height in pixels",
+          "default": 8
+        }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "description": "Performance tuning",
+      "properties": {
+        "thread_count": {
+          "type": "integer",
+          "description": "Number of threads for parallel processing (0 = auto)",
+          "default": 0,
+          "minimum": 0
+        },
+        "batch_size": {
+          "type": "integer",
+          "description": "Number of files to process in each batch",
+          "default": 100,
+          "minimum": 10
+        },
+        "memory_limit_mb": {
+          "type": "integer",
+          "description": "Memory limit in MB (0 = unlimited)",
+          "default": 0,
+          "minimum": 0
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "description": "Validation and safety checks",
+      "properties": {
+        "validate_input": {
+          "type": "boolean",
+          "description": "Validate input Java pack before conversion",
+          "default": true
+        },
+        "validate_output": {
+          "type": "boolean",
+          "description": "Validate output Bedrock pack after conversion",
+          "default": true
+        },
+        "strict_mode": {
+          "type": "boolean",
+          "description": "Fail on any warning (not just errors)",
+          "default": false
+        },
+        "backup_output": {
+          "type": "boolean",
+          "description": "Backup existing output before overwriting",
+          "default": true
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "description": "Auto-deployment settings",
+      "properties": {
+        "auto_deploy": {
+          "type": "boolean",
+          "description": "Auto-deploy to GeyserMC server after conversion",
+          "default": false
+        },
+        "geyser_path": {
+          "type": "string",
+          "description": "Path to GeyserMC packs directory",
+          "example": "/home/minecraft/server/plugins/Geyser-Spigot/packs"
+        },
+        "auto_reload": {
+          "type": "boolean",
+          "description": "Reload GeyserMC after deployment",
+          "default": false
+        },
+        "reload_command": {
+          "type": "string",
+          "description": "Command to reload server (RCON or script)",
+          "example": "rcon-cli -c 'geyser reload'"
+        }
+      }
+    },
+    "advanced": {
+      "type": "object",
+      "description": "Advanced settings for expert users",
+      "properties": {
+        "custom_namespace": {
+          "type": "string",
+          "description": "Custom namespace for generated items",
+          "default": "item.geyser",
+          "example": "item.mypack"
+        },
+        "preserve_java_paths": {
+          "type": "boolean",
+          "description": "Try to preserve original folder structure",
+          "default": true
+        },
+        "enable_experimental_features": {
+          "type": "boolean",
+          "description": "Enable experimental/beta features",
+          "default": false
+        }
+      }
+    }
+  },
+  "required": ["metadata"],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "metadata": {
+        "author": "MyName",
+        "version": "1.0.0",
+        "description": "My custom resource pack converted to Bedrock"
+      },
+      "conversion_settings": {
+        "format_version": 3,
+        "include_items": true,
+        "include_armor": true,
+        "include_sounds": true,
+        "include_fonts": true,
+        "optimize_textures": false
+      },
+      "output_settings": {
+        "create_zip_package": false,
+        "generate_summary_report": true,
+        "verbose_logging": true
+      },
+      "geysermc_settings": {
+        "generate_custom_mappings": true,
+        "enable_virtual_items": true,
+        "auto_detect_cmd": true
+      }
+    }
+  ]
+}
