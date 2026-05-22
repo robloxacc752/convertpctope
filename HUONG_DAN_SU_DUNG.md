@@ -1,7 +1,7 @@
 # 📚 HƯỚNG DẪN SỬ DỤNG MINECRAFT RESOURCE PACK CONVERTER
 
 **Phiên bản:** 1.0.0  
-**Tác giả:** Claude @ Anthropic  
+**Tác giả:** LeHoangNam @ HorseKingdom Studio  
 **Mục đích:** Chuyển đổi Resource Pack từ Minecraft Java sang Bedrock Edition với tối ưu cho GeyserMC
 
 ---
