@@ -135,7 +135,7 @@ converted_pack/
 | Vai trò | Người |
 |---------|-------|
 | Tác giả gốc | LeHoangNam @ HorseKingdom Studio |
-| Sửa lỗi & tính năng mới | Claude @ Anthropic |
+| Sửa lỗi & tính năng mới | LeHoangNam @ HorseKingdom Studio |
 
 ---
 
